@@ -2,6 +2,7 @@ services:
   - type: web
     name: voter-verify-backend
     runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: node server.js
     envVars:
@@ -9,6 +10,8 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: RENDER_SERVICE_PLAN
+        value: free
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
@@ -27,6 +30,7 @@ services:
   - type: web
     name: voter-verify-face
     runtime: python
+    plan: free
     buildCommand: chmod +x build.sh && ./build.sh
     startCommand: |
       export DEEPFACE_HOME=/opt/render/project/src/deepface_weights
@@ -35,6 +39,8 @@ services:
     envVars:
       - key: PORT
         value: 5001
+      - key: RENDER_SERVICE_PLAN
+        value: free
       - key: BACKEND_URL
         sync: false
       - key: BACKEND_API_KEY

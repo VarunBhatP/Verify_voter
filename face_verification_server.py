@@ -1,13 +1,29 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable GPU
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce TensorFlow logging
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'  # Prevent TensorFlow from allocating all GPU memory
+# Check if we're on Render free tier
+is_free_tier = os.environ.get('RENDER_SERVICE_PLAN', '').lower() == 'free'
+
+# Apply more aggressive memory optimization for free tier
+if is_free_tier:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable GPU
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce TensorFlow logging
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+    os.environ['TF_MEMORY_ALLOCATION'] = '256MB'
+else:
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable GPU
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce TensorFlow logging
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'  # Prevent TensorFlow from allocating all GPU memory
 
 # Import TensorFlow before other imports
 import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')  # Ensure GPU is disabled
-tf.config.threading.set_inter_op_parallelism_threads(1)  # Limit thread usage
-tf.config.threading.set_intra_op_parallelism_threads(1)
+
+# Set minimal threading for free tier
+if is_free_tier:
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+else:
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    tf.config.threading.set_intra_op_parallelism_threads(1)
 
 # Set memory growth for TensorFlow
 gpus = tf.config.list_physical_devices('GPU')
