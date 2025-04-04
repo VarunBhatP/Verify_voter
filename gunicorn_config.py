@@ -21,17 +21,6 @@ try:
     if port < 1 or port > 65535:
         raise ValueError(f"Invalid port number: {port}")
     
-    # Check if port is available
-    if is_port_in_use(port):
-        logger.warning(f"Port {port} is already in use. Trying to find an available port...")
-        for p in range(port, port + 10):
-            if not is_port_in_use(p):
-                port = p
-                logger.info(f"Found available port: {port}")
-                break
-        else:
-            raise RuntimeError("Could not find an available port")
-    
     logger.info(f"Using port: {port}")
 except Exception as e:
     logger.error(f"Error with PORT environment variable: {str(e)}")
@@ -81,15 +70,6 @@ worker_max_memory_percent = 50  # 50% of available memory
 accesslog = '-'  # log to stdout
 errorlog = '-'   # log to stderr
 loglevel = 'info'
-
-# Bind address with validation
-try:
-    bind = f"0.0.0.0:{port}"
-    logger.info(f"Binding to: {bind}")
-except Exception as e:
-    logger.error(f"Error setting bind address: {str(e)}")
-    bind = "0.0.0.0:5001"  # Fallback to 5001
-    logger.info(f"Falling back to default bind address: {bind}")
 
 # Worker class settings
 worker_connections = 50  # Reduced connections to minimize memory usage

@@ -32,10 +32,7 @@ services:
     runtime: python
     plan: free
     buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: |
-      export DEEPFACE_HOME=/opt/render/project/src/deepface_weights
-      export PYTHONUNBUFFERED=1
-      gunicorn -c gunicorn_config.py --bind 0.0.0.0:$PORT face_verification_server:app
+    startCommand: export DEEPFACE_HOME=/opt/render/project/src/deepface_weights export PYTHONUNBUFFERED=1 gunicorn -c gunicorn_config.py --bind 0.0.0.0:$PORT face_verification_server:app
     envVars:
       - key: PORT
         value: 5001
