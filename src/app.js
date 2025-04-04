@@ -33,6 +33,15 @@ const adminRoutes = require("./routes/adminRoutes");
 const digitalTokenRoutes = require("./routes/digitalTokenRoutes");
 const expressRoutes = require("./routes/voterRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
+const faceVerificationRoutes = require("./routes/faceVerificationRoutes");
+
+// Initialize face verification models
+const { initModels } = require('./utils/faceVerification');
+initModels().then(() => {
+  console.log('Face verification models initialized successfully');
+}).catch(err => {
+  console.error('Error initializing face verification models:', err);
+});
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -42,6 +51,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/voter', expressRoutes);
 app.use('/api/digital-token', digitalTokenRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/face', faceVerificationRoutes);
 
 // Add backward compatibility routes
 app.use('/admin', adminRoutes);
