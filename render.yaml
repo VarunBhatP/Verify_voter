@@ -31,12 +31,5 @@ services:
     name: voter-verify-face
     runtime: python
     plan: free
-    buildCommand: pip install flask flask-cors gunicorn
-    startCommand: gunicorn minimal_server:app --bind 0.0.0.0:$PORT --log-level debug --timeout 120
-    envVars:
-      - key: RENDER_SERVICE_PLAN
-        value: free
-      - key: BACKEND_URL
-        value: https://voter-verify-backend.vcin.onrender.com
-      - key: PYTHONUNBUFFERED
-        value: 1 
+    buildCommand: pip install flask gunicorn
+    startCommand: gunicorn simple_server:app --bind 0.0.0.0:$PORT 
