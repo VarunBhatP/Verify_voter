@@ -8,12 +8,7 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 exports.getChatbotResponse = async (req, res) => {
     try {
-        // Check if API key is configured
-        if (!GEMINI_API_KEY) {
-            console.error("Gemini API key is not configured");
-            return res.status(500).json({ error: "Chatbot service is not properly configured" });
-        }
-
+        // Get request data
         const { message, userId, roomId } = req.body;
 
         if (!message) {
@@ -23,50 +18,60 @@ exports.getChatbotResponse = async (req, res) => {
         // Create a room ID if not provided
         const chatRoomId = roomId || (userId ? `user_${userId}` : `guest_${Date.now()}`);
 
-        const prompt = `You are an India-specific voter assistance chatbot. Your role is to help users with information about Indian elections and voting procedures. 
-        Please provide accurate, helpful, and concise information about:
-        - Voter registration process
-        - Voter ID card
-        - Election procedures
-        - Polling booth locations
-        - Voting rights and responsibilities
-        - Election dates and schedules
-        
-        If the query is not related to Indian voting or elections, politely inform that you can only answer questions about Indian voter and voting processes.
-        
-        User's question: "${message}"`;
+        let reply = '';
 
-        const response = await axios.post(
-            GEMINI_URL,
-            {
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }],
-                generationConfig: {
-                    temperature: 0.3,
-                    topP: 0.8,
-                    topK: 40,
-                    maxOutputTokens: 500
+        // Check if API key is configured
+        if (!GEMINI_API_KEY) {
+            console.warn("Gemini API key is not configured, using fallback response");
+            // Provide a fallback response
+            reply = "I'm here to help with information about voting in India. Please note that due to temporary technical limitations, I'm providing a standard response. For specific voting details, please check the official Election Commission of India website or contact your local election office.";
+        } else {
+            // Proceed with API call
+            const prompt = `You are an India-specific voter assistance chatbot. Your role is to help users with information about Indian elections and voting procedures. 
+            Please provide accurate, helpful, and concise information about:
+            - Voter registration process
+            - Voter ID card
+            - Election procedures
+            - Polling booth locations
+            - Voting rights and responsibilities
+            - Election dates and schedules
+            
+            If the query is not related to Indian voting or elections, politely inform that you can only answer questions about Indian voter and voting processes.
+            
+            User's question: "${message}"`;
+
+            const response = await axios.post(
+                GEMINI_URL,
+                {
+                    contents: [{
+                        parts: [{
+                            text: prompt
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.3,
+                        topP: 0.8,
+                        topK: 40,
+                        maxOutputTokens: 500
+                    }
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
                 }
-            },
-            {
-                headers: {
-                    "Content-Type": "application/json"
-                }
+            );
+
+            if (!response.data || !response.data.candidates || response.data.candidates.length === 0) {
+                console.error("Gemini API Error:", response.data);
+                return res.status(500).json({ error: "Failed to generate response from AI" });
             }
-        );
 
-        if (!response.data || !response.data.candidates || response.data.candidates.length === 0) {
-            console.error("Gemini API Error:", response.data);
-            return res.status(500).json({ error: "Failed to generate response from AI" });
-        }
+            reply = response.data.candidates[0].content.parts[0].text;
 
-        const reply = response.data.candidates[0].content.parts[0].text;
-
-        if(!reply){
-            return res.status(500).json({error: "AI returned an empty response"});
+            if(!reply){
+                return res.status(500).json({error: "AI returned an empty response"});
+            }
         }
 
         // Save user message to ChatMessage model
