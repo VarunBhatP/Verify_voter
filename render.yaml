@@ -31,18 +31,12 @@ services:
     name: voter-verify-face
     runtime: python
     plan: free
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: gunicorn face_verification_server:app --bind 0.0.0.0:$PORT --log-level debug --timeout 120
+    buildCommand: pip install flask flask-cors gunicorn
+    startCommand: gunicorn minimal_server:app --bind 0.0.0.0:$PORT --log-level debug --timeout 120
     envVars:
-      - key: PORT
-        value: 5001
       - key: RENDER_SERVICE_PLAN
         value: free
       - key: BACKEND_URL
         value: https://voter-verify-backend.vcin.onrender.com
-      - key: BACKEND_API_KEY
-        sync: false
-      - key: DEEPFACE_HOME
-        value: /opt/render/project/src/deepface_weights
       - key: PYTHONUNBUFFERED
         value: 1 
