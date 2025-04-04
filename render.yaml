@@ -35,14 +35,14 @@ services:
     startCommand: |
       export DEEPFACE_HOME=/opt/render/project/src/deepface_weights
       export PYTHONUNBUFFERED=1
-      gunicorn -c gunicorn_config.py face_verification_server:app
+      gunicorn -c gunicorn_config.py --bind 0.0.0.0:$PORT face_verification_server:app
     envVars:
       - key: PORT
         value: 5001
       - key: RENDER_SERVICE_PLAN
         value: free
       - key: BACKEND_URL
-        sync: false
+        value: https://voter-verify-backend.vcin.onrender.com
       - key: BACKEND_API_KEY
         sync: false
       - key: DEEPFACE_HOME

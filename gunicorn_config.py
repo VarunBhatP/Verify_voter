@@ -102,6 +102,7 @@ def on_starting(server):
     """Log when server starts"""
     print(f"Starting gunicorn with {workers} workers and {threads} threads")
     print(f"Service plan: {os.environ.get('RENDER_SERVICE_PLAN', 'unknown')}")
+    print(f"PORT: {os.environ.get('PORT', 'not set')}")
     
     # Set environment variables for resource constraints
     if is_free_tier:
