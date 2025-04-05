@@ -1056,8 +1056,13 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                                 // Check for registered face image
                                 if (data.user.faceImageUrl || (data.user.faceEmbedding && data.user.faceEmbedding.length > 0)) {
                                     // Display registered image - prioritize faceImageUrl if available
-                                    const registeredFaceImage = data.user.faceImageUrl || data.user.faceEmbedding[0];
-                                    registeredImage.src = registeredFaceImage;
+                                    if (data.user.faceImageUrl) {
+                                        registeredImage.src = data.user.faceImageUrl;
+                                    } else if (data.user.faceImage) {
+                                        registeredImage.src = `data:image/jpeg;base64,${data.user.faceImage}`;
+                                    } else {
+                                        registeredImage.src = `data:image/jpeg;base64,${data.user.faceEmbedding[0]}`;
+                                    }
                                     registeredImage.style.display = 'block';
                                     document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString();
                                 } else {

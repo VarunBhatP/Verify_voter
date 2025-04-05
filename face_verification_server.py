@@ -46,7 +46,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(_name_)
+logger = logging.getLogger(__name__)
 
 # Create temp directory
 temp_dir = os.path.join(os.getcwd(), 'temp')
@@ -54,14 +54,15 @@ if not os.path.exists(temp_dir):
     os.makedirs(temp_dir)
     logger.info(f"Created temp directory: {temp_dir}")
 
-app = Flask(_name_)
+app = Flask(__name__)
 # Configure CORS with specific origins
 CORS(app, resources={
     r"/*": {
         "origins": [
             "http://localhost:3000",
             "https://voter-verify-26-new.onrender.com",
-            "https://voter-verify-face-ofgu.onrender.com"
+            "https://voter-verify-face-ofgu.onrender.com",
+            "https://backend-369369713332.us-central1.run.app"
         ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
