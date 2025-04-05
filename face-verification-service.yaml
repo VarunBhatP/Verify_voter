@@ -6,7 +6,7 @@ spec:
   template:
     spec:
       containers:
-      - image: gcr.io/evote-app-deployment/face-verification:v1
+      - image: gcr.io/absolute-nexus-455918-j8/face-verification:v1
         ports:
         - containerPort: 5001
         resources:
