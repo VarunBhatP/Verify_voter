@@ -201,6 +201,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="time-slots">
+                                <i class="bi bi-calendar-date me-2"></i>
+                                Time Slots
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="#" data-section="qr-verification">
                                 <i class="bi bi-qr-code-scan me-2"></i>
                                 QR Verification
@@ -299,6 +305,59 @@
                                 <tbody id="votersTableBody">
                                     <tr>
                                         <td colspan="4" class="text-center">Loading voters data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Time Slots Section -->
+                <div class="content-section" id="time-slots-section">
+                    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                        <h1 class="h2">Time Slots Management</h1>
+                    </div>
+                    
+                    <div class="dashboard-card mb-4">
+                        <h5>Create New Time Slot</h5>
+                        <form id="createTimeSlotForm">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label for="slotDate" class="form-label">Date</label>
+                                    <input type="date" class="form-control" id="slotDate" required>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="startTime" class="form-label">Start Time</label>
+                                    <input type="time" class="form-control" id="startTime" required>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="endTime" class="form-label">End Time</label>
+                                    <input type="time" class="form-control" id="endTime" required>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label for="maxAppointments" class="form-label">Max Appointments</label>
+                                    <input type="number" class="form-control" id="maxAppointments" min="1" value="10" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Create Time Slot</button>
+                        </form>
+                        <div id="timeSlotFormMessage" class="mt-3" style="display: none;"></div>
+                    </div>
+                    
+                    <div class="dashboard-card">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Start Time</th>
+                                        <th>End Time</th>
+                                        <th>Available Slots</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timeSlotsTableBody">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Loading time slots data...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -420,8 +479,11 @@
                                         </div>
                                         
                                         <div id="verificationActions" class="mt-4 text-center" style="display: none;">
-                                            <button id="continueToVotingBtn" class="btn btn-success">
-                                                <i class="bi bi-check-circle"></i> Continue to Voting
+                                            <div id="verificationStatus" class="alert alert-info mb-3">
+                                                Verification status will appear here
+                                            </div>
+                                            <button id="nextVoterBtn" class="btn btn-primary">
+                                                <i class="bi bi-arrow-right-circle"></i> Next Voter
                                             </button>
                                         </div>
                                     </div>
@@ -477,6 +539,7 @@
             initializeQRScanner();
             initializeFaceVerification();
             initializeAIAssistant();
+            initializeTimeSlots();
             
             // Logout button
             document.getElementById('logoutBtn').addEventListener('click', function() {
@@ -508,6 +571,8 @@
                     // Load section data if needed
                     if (sectionId === 'voters-section') {
                         loadVoters();
+                    } else if (sectionId === 'time-slots-section') {
+                        loadTimeSlots();
                     }
                 });
             });
@@ -632,6 +697,55 @@
                 document.getElementById('votersTableBody').innerHTML = `
                     <tr>
                         <td colspan="4" class="text-center text-danger">Error loading voters</td>
+                    </tr>
+                `;
+            }
+        }
+        
+        // Load time slots
+        async function loadTimeSlots() {
+            try {
+                const token = localStorage.getItem('adminToken');
+                const response = await fetch('/api/admin/time-slots', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const timeSlots = data.timeSlots || [];
+                    const timeSlotsTableBody = document.getElementById('timeSlotsTableBody');
+                    timeSlotsTableBody.innerHTML = '';
+                    
+                    if (timeSlots.length === 0) {
+                        timeSlotsTableBody.innerHTML = '<tr><td colspan="4" class="text-center">No time slots found</td></tr>';
+                        return;
+                    }
+                    
+                    timeSlots.forEach(timeSlot => {
+                        const row = document.createElement('tr');
+                        const availableSlots = timeSlot.maxAppointments - (timeSlot.currentBookings || 0);
+                        row.innerHTML = `
+                            <td>${formatDate(timeSlot.date)}</td>
+                            <td>${timeSlot.startTime}</td>
+                            <td>${timeSlot.endTime}</td>
+                            <td>${availableSlots}/${timeSlot.maxAppointments}</td>
+                        `;
+                        timeSlotsTableBody.appendChild(row);
+                    });
+                } else {
+                    document.getElementById('timeSlotsTableBody').innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center text-danger">Error loading time slots</td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading time slots:', error);
+                document.getElementById('timeSlotsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-danger">Error loading time slots</td>
                     </tr>
                 `;
             }
@@ -858,8 +972,9 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
             const matchProgress = document.getElementById('matchProgress');
             if (matchPercentage) matchPercentage.textContent = "0";
             if (matchProgress) {
-                matchProgress.style.width = "0%";
-                matchProgress.setAttribute('aria-valuenow', "0");
+                const percentage = 0;
+                matchProgress.style.width = `${percentage}%`;
+                matchProgress.setAttribute('aria-valuenow', percentage);
             }
             
             // Clear voter ID from dataset
@@ -958,7 +1073,7 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                     }
                 } else {
                     faceVerificationStatus.textContent = 'No voter ID found. Please verify QR code first.';
-                    faceVerificationStatus.className = 'alert alert-warning';
+                    faceVerificationStatus.className = 'alert alert-danger';
                 }
             });
             
@@ -1004,16 +1119,12 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                         throw new Error('No registered face found for this voter');
                     }
 
-                    // Display registered image - prioritize faceImageUrl if available
+                    // Display the registered face image
                     const registeredFaceImage = data.user.faceImageUrl || data.user.faceEmbedding[0];
                     if (!registeredFaceImage) {
                         throw new Error('No valid face image found');
                     }
 
-                    // Display the registered face image
-                    registeredImage.src = registeredFaceImage;
-                    registeredImage.style.display = 'block';
-                    
                     // Verify face
                     const verificationResponse = await fetch('/api/admin/verify-face', {
                         method: 'POST',
@@ -1031,164 +1142,88 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                     const verificationData = await verificationResponse.json();
                     console.log('Verification response:', verificationData);
                     
-                    if (!verificationResponse.ok) {
-                        // Handle 401 specifically
-                        if (verificationResponse.status === 401) {
-                            if (verificationData.matchPercentage >= 70) {
-                                faceVerificationStatus.textContent = `Face verification successful! Match percentage: ${verificationData.matchPercentage.toFixed(2)}%`;
-                                faceVerificationStatus.className = 'alert alert-success';
-                                
-                                // Update match percentage display
-                                const matchPercentageElement = document.getElementById('matchPercentage');
-                                const matchProgressElement = document.getElementById('matchProgress');
-                                const verificationActions = document.getElementById('verificationActions');
-                                
-                                if (matchPercentageElement) matchPercentageElement.textContent = verificationData.matchPercentage.toFixed(2);
-                                if (matchProgressElement) {
-                                    matchProgressElement.style.width = `${verificationData.matchPercentage}%`;
-                                    matchProgressElement.setAttribute('aria-valuenow', verificationData.matchPercentage);
-                                }
-                                if (verificationActions) verificationActions.style.display = 'block';
-                            } else {
-                                faceVerificationStatus.textContent = `Face verification failed. Match percentage: ${verificationData.matchPercentage.toFixed(2)}%`;
-                                faceVerificationStatus.className = 'alert alert-danger';
-                                
-                                // Hide continue to voting button
-                                const verificationActions = document.getElementById('verificationActions');
-                                if (verificationActions) {
-                                    verificationActions.style.display = 'none';
-                                }
-                            }
-                        } else {
-                            // Handle other errors
-                            faceVerificationStatus.textContent = verificationData.error || 'Face verification failed';
-                            faceVerificationStatus.className = 'alert alert-danger';
-                            
-                            // Hide continue to voting button
-                            const verificationActions = document.getElementById('verificationActions');
-                            if (verificationActions) {
-                                verificationActions.style.display = 'none';
-                            }
-                        }
-                    } else if (!verificationData.success) {
+                    // Update match percentage display
+                    const matchPercentageElement = document.getElementById('matchPercentage');
+                    const matchProgressElement = document.getElementById('matchProgress');
+                    const verificationActions = document.getElementById('verificationActions');
+                    const verificationStatus = document.getElementById('verificationStatus');
+                    
+                    if (matchPercentageElement) matchPercentageElement.textContent = verificationData.matchPercentage ? verificationData.matchPercentage.toFixed(2) : '0';
+                    if (matchProgressElement) {
+                        const percentage = verificationData.matchPercentage || 0;
+                        matchProgressElement.style.width = `${percentage}%`;
+                        matchProgressElement.setAttribute('aria-valuenow', percentage);
+                    }
+                    
+                    // Show verification actions section
+                    if (verificationActions) verificationActions.style.display = 'block';
+                    
+                    if (!verificationResponse.ok || !verificationData.success) {
                         // Handle verification failure
                         faceVerificationStatus.textContent = verificationData.error || 'Face verification failed';
                         faceVerificationStatus.className = 'alert alert-danger';
                         
-                        // Hide continue to voting button
-                        const verificationActions = document.getElementById('verificationActions');
-                        if (verificationActions) {
-                            verificationActions.style.display = 'none';
+                        if (verificationStatus) {
+                            verificationStatus.textContent = 'User Not Found';
+                            verificationStatus.className = 'alert alert-danger';
                         }
                     } else {
                         // Handle successful verification
-                        faceVerificationStatus.textContent = `Face verification successful! Match percentage: ${verificationData.matchPercentage.toFixed(2)}%`;
-                        faceVerificationStatus.className = 'alert alert-success';
+                        const matchPercentage = verificationData.matchPercentage || 0;
                         
-                        // Update match percentage display
-                        const matchPercentageElement = document.getElementById('matchPercentage');
-                        const matchProgressElement = document.getElementById('matchProgress');
-                        const verificationActions = document.getElementById('verificationActions');
-                        
-                        if (matchPercentageElement) matchPercentageElement.textContent = verificationData.matchPercentage.toFixed(2);
-                        if (matchProgressElement) {
-                            matchProgressElement.style.width = `${verificationData.matchPercentage}%`;
-                            matchProgressElement.setAttribute('aria-valuenow', verificationData.matchPercentage);
+                        if (matchPercentage >= 70) {
+                            faceVerificationStatus.textContent = `Face verification successful! Match percentage: ${matchPercentage.toFixed(2)}%`;
+                            faceVerificationStatus.className = 'alert alert-success';
+                            
+                            if (verificationStatus) {
+                                verificationStatus.textContent = 'Voter Verified';
+                                verificationStatus.className = 'alert alert-success';
+                            }
+                            
+                            // Update voter status to allowed
+                            await fetch(`/api/voters/${voterId}/status`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                    status: 'allowed'
+                                })
+                            });
+                        } else {
+                            faceVerificationStatus.textContent = `Face verification failed. Match percentage: ${matchPercentage.toFixed(2)}%`;
+                            faceVerificationStatus.className = 'alert alert-danger';
+                            
+                            if (verificationStatus) {
+                                verificationStatus.textContent = 'User Not Found';
+                                verificationStatus.className = 'alert alert-danger';
+                            }
                         }
-                        if (verificationActions) verificationActions.style.display = 'block';
                     }
                 } catch (error) {
                     console.error('Face verification error:', error);
                     faceVerificationStatus.textContent = error.message || 'Error verifying face';
                     faceVerificationStatus.className = 'alert alert-danger';
-                }
-            });
-            
-            // Handle continue to voting button
-            document.getElementById('continueToVotingBtn').addEventListener('click', function() {
-                const voterId = localStorage.getItem('currentVoterId');
-                if (voterId) {
-                    // Update voter status to allowed
-                    fetch(`/api/voters/${voterId}/status`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            status: 'allowed'
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Voter verified successfully! Please proceed to the voting booth.');
-                            resetFaceVerification();
-                        } else {
-                            alert('Error updating voter status.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Error updating voter status.');
-                    });
-                }
-            });
-            
-            // Add event listener for update face button
-            document.getElementById('updateFaceBtn').addEventListener('click', async function() {
-                if (!capturedImage) {
-                    faceVerificationStatus.textContent = 'Please capture an image first.';
-                    faceVerificationStatus.className = 'alert alert-warning';
-                    return;
-                }
-                
-                const voterId = localStorage.getItem('currentVoterId');
-                if (!voterId) {
-                    faceVerificationStatus.textContent = 'No voter ID found. Please verify QR code first.';
-                    faceVerificationStatus.className = 'alert alert-danger';
-                    return;
-                }
-                
-                try {
-                    faceVerificationStatus.textContent = 'Updating face photo...';
-                    faceVerificationStatus.className = 'alert alert-info';
                     
-                    const token = localStorage.getItem('adminToken');
-                    const response = await fetch('/api/admin/register-face', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                            image: capturedImage,
-                            userId: voterId
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'Failed to update face photo');
+                    const verificationStatus = document.getElementById('verificationStatus');
+                    if (verificationStatus) {
+                        verificationStatus.textContent = 'User Not Found';
+                        verificationStatus.className = 'alert alert-danger';
                     }
-                    
-                    const data = await response.json();
-                    
-                    // Update the registered image display
-                    document.getElementById('registeredImage').src = data.faceImageUrl;
-                    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleString();
-                    
-                    faceVerificationStatus.textContent = 'Face photo updated successfully!';
-                    faceVerificationStatus.className = 'alert alert-success';
-                    
-                    // Reset verification status
-                    user.faceVerifiedAt = null;
-                    await user.save();
-                    
-                } catch (error) {
-                    console.error('Face update error:', error);
-                    faceVerificationStatus.textContent = 'Error updating face photo: ' + error.message;
-                    faceVerificationStatus.className = 'alert alert-danger';
                 }
+            });
+            
+            // Handle next voter button
+            document.getElementById('nextVoterBtn').addEventListener('click', function() {
+                // Reset the face verification UI
+                resetFaceVerification();
+                
+                // Clear the current voter ID
+                localStorage.removeItem('currentVoterId');
+                
+                // Redirect to QR verification section
+                document.querySelector('a[data-section="qr-verification"]').click();
             });
         }
         
@@ -1355,6 +1390,82 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         }
+
+        // Initialize time slots functionality
+        function initializeTimeSlots() {
+            const createTimeSlotForm = document.getElementById('createTimeSlotForm');
+            const timeSlotFormMessage = document.getElementById('timeSlotFormMessage');
+            
+            // Set default date to today
+            document.getElementById('slotDate').valueAsDate = new Date();
+            
+            createTimeSlotForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                
+                const slotDate = document.getElementById('slotDate').value;
+                const startTime = document.getElementById('startTime').value;
+                const endTime = document.getElementById('endTime').value;
+                const maxAppointments = document.getElementById('maxAppointments').value;
+                
+                // Validate inputs
+                if (!slotDate || !startTime || !endTime || !maxAppointments) {
+                    showTimeSlotMessage('Please fill all fields', 'danger');
+                    return;
+                }
+                
+                // Validate time range
+                if (startTime >= endTime) {
+                    showTimeSlotMessage('End time must be after start time', 'danger');
+                    return;
+                }
+                
+                try {
+                    showTimeSlotMessage('Creating time slot...', 'info');
+                    
+                    const token = localStorage.getItem('adminToken');
+                    const response = await fetch('/api/admin/time-slots', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            date: slotDate,
+                            startTime: startTime,
+                            endTime: endTime,
+                            maxAppointments: parseInt(maxAppointments)
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        showTimeSlotMessage('Time slot created successfully!', 'success');
+                        createTimeSlotForm.reset();
+                        document.getElementById('slotDate').valueAsDate = new Date();
+                        
+                        // Reload time slots
+                        loadTimeSlots();
+                    } else {
+                        showTimeSlotMessage(data.error || 'Failed to create time slot', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error creating time slot:', error);
+                    showTimeSlotMessage('Error creating time slot', 'danger');
+                }
+            });
+            
+            function showTimeSlotMessage(message, type) {
+                timeSlotFormMessage.textContent = message;
+                timeSlotFormMessage.className = `alert alert-${type}`;
+                timeSlotFormMessage.style.display = 'block';
+                
+                // Hide message after 5 seconds
+                setTimeout(() => {
+                    timeSlotFormMessage.style.display = 'none';
+                }, 5000);
+            }
+        }
     </script>
 </body>
-</html> 
+</html>

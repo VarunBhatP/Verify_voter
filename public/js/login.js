@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const password = document.getElementById("password").value;
   
       try {
-        const response = await fetch("https://voter-verify-backend-ry3f.onrender.com/api/auth/login", {
+        const response = await fetch("/api/auth/login", {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
@@ -41,4 +41,3 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
-  

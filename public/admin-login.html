@@ -20,8 +20,8 @@ class="flex flex-col bg-gradient-to-b from-slate-100 to-blue-200 min-h-screen"
             </div>
             <nav>
               <ul class="flex space-x-6 text-white">
-                <li><a href="/" class="hover:text-sky-300">Home</a></li>
-                <li><a href="/voter/login" class="hover:text-sky-300">Voter Login</a></li>
+                <li><a href="index.html" class="hover:text-sky-300">Home</a></li>
+                <li><a href="login.html" class="hover:text-sky-300">Voter Login</a></li>
               </ul>
             </nav>
           </div>
@@ -90,14 +90,14 @@ class="flex flex-col bg-gradient-to-b from-slate-100 to-blue-200 min-h-screen"
                 } else {
                     // Show error message
                     errorMessage.textContent = data.error || data.message || 'Login failed. Please check your credentials.';
-                    errorMessage.classList.remove('d-none');
+                    errorMessage.classList.remove('hidden');
                 }
             } catch (error) {
                 console.error('Login error:', error);
                 errorMessage.textContent = 'An error occurred. Please try again.';
-                errorMessage.classList.remove('d-none');
+                errorMessage.classList.remove('hidden');
             }
         });
     </script>
 </body>
-</html> 
+</html>
