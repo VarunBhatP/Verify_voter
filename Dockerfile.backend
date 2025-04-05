@@ -24,14 +24,14 @@ RUN mkdir -p src/models && \
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 
 # Expose the port
-EXPOSE 3000
+EXPOSE 8080
 
 # Add healthcheck with more time
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Command to run the application
-CMD ["node", "server.js"] 
+CMD ["node", "server.js"]

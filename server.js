@@ -7,7 +7,7 @@ const ChatMessage = require('./src/models/ChatMessage');
 
 // Load environment variables
 dotenv.config();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.set('port', PORT);
 
 // Get MongoDB URI from environment variables
@@ -91,6 +91,6 @@ io.on('connection', (socket) => {
 // Function to start the server
 function startServer() {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(` Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
