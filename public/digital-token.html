@@ -280,13 +280,7 @@
             'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            userId: userData._id,
-            voterId: userData.voterId,
-            name: userData.name,
-            phoneNumber: userData.phoneNumber
-          })
+          }
         });
 
         console.log('Token generation response status:', tokenResponse.status);

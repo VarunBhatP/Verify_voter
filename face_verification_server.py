@@ -19,7 +19,7 @@ if gpus:
         print(e)
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from deepface import DeepFace
 import numpy as np
 import base64
@@ -62,7 +62,8 @@ CORS(app, resources={
             "http://localhost:3000",
             "https://voter-verify-26-new.onrender.com",
             "https://voter-verify-face-ofgu.onrender.com",
-            "https://backend-369369713332.us-central1.run.app"
+            "https://backend-369369713332.us-central1.run.app",
+            "https://face-verification-369369713332.us-central1.run.app"
         ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
@@ -393,7 +394,14 @@ def verify_face():
         tf.keras.backend.clear_session()
         gc.collect()
 
-@app.route('/register', methods=['POST'])
+@app.route('/api/register', methods=['POST', 'OPTIONS'])
+@cross_origin(origins=[
+    "http://localhost:3000",
+    "https://voter-verify-26-new.onrender.com",
+    "https://voter-verify-face-ofgu.onrender.com",
+    "https://backend-369369713332.us-central1.run.app",
+    "https://face-verification-369369713332.us-central1.run.app"
+], methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", "Authorization"], supports_credentials=True)
 @process_request
 def register_face():
     try:

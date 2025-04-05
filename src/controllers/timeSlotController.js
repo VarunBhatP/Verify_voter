@@ -122,6 +122,9 @@ exports.getQueueStatus = async (req, res) => {
       return res.status(404).json({ error: "Time slot not found" });
     }
 
+    // Ensure bookedVoters is an array
+    const bookedVoters = slot.bookedVoters || [];
+
     const startDateTime = moment(`${slot.date} ${slot.startTime}`, "YYYY-MM-DD h:mm A");
     const now = moment();
 
@@ -130,18 +133,19 @@ exports.getQueueStatus = async (req, res) => {
 
     const avgServiceTimePerVoter = 5;
     const votersServed = Math.floor(elapsedMinutes / avgServiceTimePerVoter);
-    const currentToken = Math.min(votersServed, slot.bookedVoters.length);
-    const currentVoter = slot.bookedVoters[currentToken] || null;
+    const currentToken = Math.min(votersServed, bookedVoters.length);
+    const currentVoter = bookedVoters[currentToken] || null;
     const nextVoterPosition = currentToken + 1;
     const estimatedWait = nextVoterPosition * avgServiceTimePerVoter;
 
     res.status(200).json({
       slotId: slot._id,
       startTime: slot.startTime,
-      bookedCount: slot.bookedVoters.length,
+      endTime: slot.endTime,
+      bookedCount: bookedVoters.length,
       currentToken,
       currentVoter,
-      nextVoter: slot.bookedVoters[nextVoterPosition] || null,
+      nextVoter: bookedVoters[nextVoterPosition] || null,
       estimatedWait: `${estimatedWait} minutes`
     });
 
@@ -187,9 +191,3 @@ exports.getBookedSlot = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
-
-
-
-
-
