@@ -4,7 +4,8 @@ const ChatbotHistory = require('../models/chatbotModel');
 const ChatMessage = require('../models/ChatMessage');
 
 // Get API key from environment variables
-const GEMINI_API_KEY = "AIzaSyDa-u7Qi86MtzrmXvBGPe1jbH4Ns_Vv-xg"; // Direct API key for testing
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Direct API key for testing
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
 
 console.log("Chatbot controller loaded with API key:", GEMINI_API_KEY ? "Yes" : "No");
