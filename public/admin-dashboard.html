@@ -1144,6 +1144,57 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                         })
                     });
                     
+                    if (!verificationResponse.ok) {
+                        console.error('Verification API error:', verificationResponse.status);
+                        // Try the face verification service directly
+                        try {
+                            const faceVerificationUrl = 'https://face-verification-369369713332.us-central1.run.app/verify';
+                            console.log('Trying direct face verification service at:', faceVerificationUrl);
+                            
+                            const directVerificationResponse = await fetch(faceVerificationUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    image1: capturedImage,
+                                    image2: registeredFaceImage,
+                                    userId: voterId
+                                })
+                            });
+                            
+                            if (directVerificationResponse.ok) {
+                                const verificationData = await directVerificationResponse.json();
+                                console.log('Direct verification response:', verificationData);
+                                
+                                // Update match percentage display
+                                const matchPercentageElement = document.getElementById('matchPercentage');
+                                const matchProgressElement = document.getElementById('matchProgress');
+                                const verificationActions = document.getElementById('verificationActions');
+                                const verificationStatus = document.getElementById('verificationStatus');
+                                
+                                if (matchPercentageElement) matchPercentageElement.textContent = verificationData.matchPercentage ? verificationData.matchPercentage.toFixed(2) : '0';
+                                if (matchProgressElement) {
+                                    const percentage = verificationData.matchPercentage || 0;
+                                    matchProgressElement.style.width = `${percentage}%`;
+                                    matchProgressElement.setAttribute('aria-valuenow', percentage);
+                                }
+                                
+                                // Show verification actions section
+                                if (verificationActions) verificationActions.style.display = 'block';
+                                
+                                handleVerificationResult(verificationData);
+                                return;
+                            } else {
+                                console.error('Direct verification failed:', await directVerificationResponse.text());
+                                throw new Error('Face verification failed with both methods');
+                            }
+                        } catch (directError) {
+                            console.error('Error with direct verification:', directError);
+                            throw new Error('Face verification failed: ' + directError.message);
+                        }
+                    }
+                    
                     const verificationData = await verificationResponse.json();
                     console.log('Verification response:', verificationData);
                     
@@ -1163,46 +1214,52 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                     // Show verification actions section
                     if (verificationActions) verificationActions.style.display = 'block';
                     
-                    if (!verificationResponse.ok || !verificationData.success) {
-                        // Handle verification failure
-                        faceVerificationStatus.textContent = verificationData.error || 'Face verification failed';
-                        faceVerificationStatus.className = 'alert alert-danger';
-                        
-                        if (verificationStatus) {
-                            verificationStatus.textContent = 'User Not Found';
-                            verificationStatus.className = 'alert alert-danger';
-                        }
-                    } else {
-                        // Handle successful verification
-                        const matchPercentage = verificationData.matchPercentage || 0;
-                        
-                        if (matchPercentage >= 70) {
-                            faceVerificationStatus.textContent = `Face verification successful! Match percentage: ${matchPercentage.toFixed(2)}%`;
-                            faceVerificationStatus.className = 'alert alert-success';
-                            
-                            if (verificationStatus) {
-                                verificationStatus.textContent = 'Voter Verified';
-                                verificationStatus.className = 'alert alert-success';
-                            }
-                            
-                            // Update voter status to allowed
-                            await fetch(`/api/voters/${voterId}/status`, {
-                                method: 'PUT',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                    status: 'allowed'
-                                })
-                            });
-                        } else {
-                            faceVerificationStatus.textContent = `Face verification failed. Match percentage: ${matchPercentage.toFixed(2)}%`;
+                    handleVerificationResult(verificationData);
+                    
+                    function handleVerificationResult(verificationData) {
+                        if (!verificationData.success) {
+                            // Handle verification failure
+                            faceVerificationStatus.textContent = verificationData.error || 'Face verification failed';
                             faceVerificationStatus.className = 'alert alert-danger';
                             
                             if (verificationStatus) {
                                 verificationStatus.textContent = 'User Not Found';
                                 verificationStatus.className = 'alert alert-danger';
+                            }
+                        } else {
+                            // Handle successful verification
+                            const matchPercentage = verificationData.matchPercentage || 0;
+                            
+                            if (matchPercentage >= 70) {
+                                faceVerificationStatus.textContent = `Face verification successful! Match percentage: ${matchPercentage.toFixed(2)}%`;
+                                faceVerificationStatus.className = 'alert alert-success';
+                                
+                                if (verificationStatus) {
+                                    verificationStatus.textContent = 'Voter Verified';
+                                    verificationStatus.className = 'alert alert-success';
+                                }
+                                
+                                // Update voter status to allowed
+                                const voterId = localStorage.getItem('currentVoterId');
+                                const token = localStorage.getItem('adminToken');
+                                fetch(`/api/voters/${voterId}/status`, {
+                                    method: 'PUT',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                        status: 'allowed'
+                                    })
+                                });
+                            } else {
+                                faceVerificationStatus.textContent = `Face verification failed. Match percentage: ${matchPercentage.toFixed(2)}%`;
+                                faceVerificationStatus.className = 'alert alert-danger';
+                                
+                                if (verificationStatus) {
+                                    verificationStatus.textContent = 'User Not Found';
+                                    verificationStatus.className = 'alert alert-danger';
+                                }
                             }
                         }
                     }

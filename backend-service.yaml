@@ -6,7 +6,7 @@ spec:
   template:
     spec:
       containers:
-      - image: gcr.io/absolute-nexus-455918-j8/backend:v6
+      - image: gcr.io/absolute-nexus-455918-j8/backend:v7
         ports:
         - containerPort: 3000
         resources:
@@ -29,7 +29,27 @@ spec:
               name: evote-secrets
               key: jwt-secret
         - name: FACE_VERIFICATION_URL
-          value: "https://face-verification-v5heid6ezq-uc.a.run.app"
+          value: "https://face-verification-369369713332.us-central1.run.app"
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: evote-secrets
+              key: gemini-api-key
+        - name: CLOUDINARY_CLOUD_NAME
+          valueFrom:
+            secretKeyRef:
+              name: evote-secrets
+              key: cloudinary-cloud-name
+        - name: CLOUDINARY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: evote-secrets
+              key: cloudinary-api-key
+        - name: CLOUDINARY_API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: evote-secrets
+              key: cloudinary-api-secret
         livenessProbe:
           httpGet:
             path: /health

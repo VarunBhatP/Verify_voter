@@ -394,6 +394,166 @@ def verify_face():
         tf.keras.backend.clear_session()
         gc.collect()
 
+@app.route('/verify-voting', methods=['POST', 'OPTIONS'])
+@cross_origin(origins=[
+    "http://localhost:3000",
+    "https://voter-verify-26-new.onrender.com",
+    "https://voter-verify-face-ofgu.onrender.com",
+    "https://backend-369369713332.us-central1.run.app",
+    "https://face-verification-369369713332.us-central1.run.app"
+])
+def verify_voting():
+    """Endpoint specifically for voting verification with more lenient CORS"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response
+        
+    try:
+        manage_memory()  # Check memory before processing
+        
+        # Log the incoming request
+        logger.info("Received voting verification request")
+        
+        # Log request headers
+        logger.info(f"Request headers: {dict(request.headers)}")
+        
+        # Check content type
+        if request.content_type != 'application/json':
+            logger.error(f"Invalid content type: {request.content_type}")
+            return jsonify({
+                'success': False,
+                'message': 'Invalid content type. Expected application/json',
+                'error': 'invalid_content_type'
+            }), 400
+        
+        data = request.get_json()
+        if not data:
+            logger.error("No JSON data received in request")
+            return jsonify({
+                'success': False,
+                'message': 'No data received in request',
+                'error': 'missing_data'
+            }), 400
+            
+        # Log the received data structure
+        logger.info(f"Received data keys: {list(data.keys())}")
+        
+        # Check for image fields
+        if 'image1' not in data or 'image2' not in data:
+            logger.error("Missing required image fields")
+            logger.error(f"Available fields: {list(data.keys())}")
+            return jsonify({
+                'success': False,
+                'message': 'Missing required fields: image1 and image2',
+                'error': 'missing_images',
+                'received_fields': list(data.keys())
+            }), 400
+
+        # Process both images with memory optimization
+        try:
+            # Process first image
+            image1_data = data['image1'].split(',')[1] if ',' in data['image1'] else data['image1']
+            nparr1 = np.frombuffer(base64.b64decode(image1_data), np.uint8)
+            img1 = cv2.imdecode(nparr1, cv2.IMREAD_COLOR)
+            
+            # Clear memory after processing first image
+            del image1_data, nparr1
+            gc.collect()
+            
+            # Process second image
+            image2_data = data['image2'].split(',')[1] if ',' in data['image2'] else data['image2']
+            nparr2 = np.frombuffer(base64.b64decode(image2_data), np.uint8)
+            img2 = cv2.imdecode(nparr2, cv2.IMREAD_COLOR)
+            
+            # Clear memory after processing second image
+            del image2_data, nparr2
+            gc.collect()
+            
+            if img1 is None or img2 is None:
+                logger.error("Failed to decode one or both images")
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to decode images',
+                    'error': 'image_decode_failed'
+                }), 400
+                
+            # Convert BGR to RGB
+            rgb_img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
+            rgb_img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
+            
+            # Clear original images
+            del img1, img2
+            gc.collect()
+            
+            # Verify faces using DeepFace with optimized settings
+            result = DeepFace.verify(
+                rgb_img1, 
+                rgb_img2, 
+                model_name='Facenet',
+                detector_backend='skip',  # Skip face detection for self-comparison
+                enforce_detection=False,  # Don't enforce face detection
+                distance_metric='cosine'  # Use cosine distance for better performance
+            )
+            
+            # Clear processed images
+            del rgb_img1, rgb_img2
+            gc.collect()
+            
+            # Calculate match percentage
+            distance = float(result['distance'])
+            threshold = float(result['threshold'])
+            match_percentage = max(0, min(100, (1 - (distance / threshold)) * 100))
+            
+            # Clear result dictionary
+            del result
+            gc.collect()
+            
+            return jsonify({
+                'success': True,
+                'verified': True if match_percentage >= 70 else False,  # 70% threshold for match
+                'distance': distance,
+                'threshold': threshold,
+                'matchPercentage': match_percentage,
+                'isMatch': True if match_percentage >= 70 else False
+            })
+        except Exception as e:
+            logger.error(f"Image processing error: {str(e)}")
+            if "No face detected" in str(e):
+                return jsonify({
+                    'success': False,
+                    'message': 'No face detected in one or both images',
+                    'error': 'no_face_detected',
+                    'matchPercentage': 0,
+                    'isMatch': False
+                }), 400
+            return jsonify({
+                'success': False,
+                'message': f'Error processing images: {str(e)}',
+                'error': 'image_processing_error',
+                'matchPercentage': 0,
+                'isMatch': False
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Verification error: {str(e)}")
+        logger.error(f"Request data: {str(data)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error verifying faces: {str(e)}',
+            'error': 'verification_error',
+            'matchPercentage': 0,
+            'isMatch': False
+        }), 500
+    finally:
+        # Final cleanup
+        manage_memory()
+        tf.keras.backend.clear_session()
+        gc.collect()
+
 @app.route('/api/register', methods=['POST', 'OPTIONS'])
 @cross_origin(origins=[
     "http://localhost:3000",
@@ -417,10 +577,30 @@ def register_face():
         nparr = np.frombuffer(base64.b64decode(image_data), np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
-        # Verify face
+        # Check face quality
+        quality_result = check_face_quality(img)
+        if not quality_result['success']:
+            return jsonify(quality_result), 400
+        
+        # Create directory for user if it doesn't exist
+        user_id = data['userId']
+        user_dir = os.path.join('face_db', user_id)
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Save the face image
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        image_path = os.path.join(user_dir, f"{timestamp}.jpg")
+        cv2.imwrite(image_path, img)
+        
+        logger.info(f"Face image saved for user {user_id} at {image_path}")
+        
+        # Verify face is detectable
         try:
             DeepFace.verify(img, img, model_name='Facenet')
         except Exception as e:
+            # Remove the saved image if verification fails
+            if os.path.exists(image_path):
+                os.remove(image_path)
             return jsonify({
                 'success': False,
                 'message': f'Face verification failed: {str(e)}'
@@ -428,9 +608,11 @@ def register_face():
 
         return jsonify({
             'success': True,
-            'message': 'Face registered successfully'
+            'message': 'Face registered successfully',
+            'imagePath': image_path
         })
     except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
         print(f"Registration error: {str(e)}")
         return jsonify({
             'success': False,

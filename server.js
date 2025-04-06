@@ -20,23 +20,45 @@ mongoose.set('debug', true);
 // Connect to MongoDB with improved options
 mongoose.connect(MONGODB_URI, {
   connectTimeoutMS: 30000,
-  socketTimeoutMS: 45000
+  socketTimeoutMS: 45000,
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 30000, // Give the server more time to respond
+  heartbeatFrequencyMS: 10000     // Check connection more frequently
 })
 .then(() => {
   console.log('Connected to MongoDB successfully');
   console.log('MongoDB connection state:', mongoose.connection.readyState);
-  console.log('Available collections:', mongoose.connection.db ? 'DB accessible' : 'DB not accessible');
   
-  // Test connection by listing collections
-  mongoose.connection.db.listCollections().toArray()
-    .then(collections => {
-      console.log('Collections in database:', collections.map(c => c.name).join(', '));
-    })
-    .catch(err => {
-      console.error('Error listing collections:', err);
-    });
+  // Check if the database connection is established properly
+  if (mongoose.connection.db) {
+    console.log('Database connection established successfully');
     
-  startServer();
+    // Test connection by listing collections safely
+    try {
+      mongoose.connection.db.listCollections().toArray()
+        .then(collections => {
+          console.log('Collections in database:', collections.map(c => c.name).join(', '));
+          // Start the server after confirming database connection
+          startServer();
+        })
+        .catch(err => {
+          console.error('Error listing collections:', err);
+          // Continue with server startup despite collection listing error
+          startServer();
+        });
+    } catch (error) {
+      console.error('Error accessing collections:', error);
+      // Continue with server startup despite error
+      startServer();
+    }
+  } else {
+    console.log('Database connection object not available yet, continuing startup');
+    // Wait a short time and then start the server anyway
+    setTimeout(() => {
+      startServer();
+    }, 2000);
+  }
 })
 .catch(err => {
   console.error('Could not connect to MongoDB:', err);
@@ -106,7 +128,30 @@ io.on('connection', (socket) => {
 
 // Function to start the server
 function startServer() {
-  server.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+  });
+  
+  server.on('error', (error) => {
+    console.error('Server error:', error);
+    if (error.syscall !== 'listen') {
+      throw error;
+    }
+    
+    const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+    
+    // Handle specific listen errors with friendly messages
+    switch (error.code) {
+      case 'EACCES':
+        console.error(bind + ' requires elevated privileges');
+        process.exit(1);
+        break;
+      case 'EADDRINUSE':
+        console.error(bind + ' is already in use');
+        process.exit(1);
+        break;
+      default:
+        throw error;
+    }
   });
 }

@@ -16,7 +16,12 @@ exports.generateDigitalToken = async (req, res) => {
     console.log("User ID from auth:", voterId);
     
     // Check MongoDB connection
-    console.log("MongoDB connection state:", mongoose.connection.readyState);
+    const connectionState = mongoose.connection.readyState;
+    console.log("MongoDB connection state:", connectionState);
+    if (connectionState !== 1) {
+      console.error("MongoDB connection is not open. Current state:", connectionState);
+      return res.status(500).json({ error: "Database connection issue. Please try again later." });
+    }
     
     // Find the user's booked slot
     console.log("Finding user with ID:", voterId);
@@ -97,6 +102,7 @@ exports.generateDigitalToken = async (req, res) => {
         }
       });
       console.log("QR code generated successfully");
+      console.log("QR code URL length:", qrCodeUrl ? qrCodeUrl.length : 0);
       
     } catch (qrError) {
       console.error("Error generating QR code:", qrError);
@@ -146,9 +152,15 @@ exports.generateDigitalToken = async (req, res) => {
     }
     
     console.log("Sending successful response...");
+    // Ensure the QR code URL is included in the response
     res.status(200).json({
       message: "Digital token generated successfully",
-      qrCodeUrl: qrCodeUrl
+      qrCodeUrl: qrCodeUrl,
+      tokenData: {
+        voterId: voterId,
+        slotId: bookedSlot._id.toString(),
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
     console.error("Error generating digital token:", error);
