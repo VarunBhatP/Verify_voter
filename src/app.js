@@ -20,7 +20,7 @@ const app = express();
 
 // CORS configuration
 app.use(cors({
-  origin: ['https://voter-verify-backend-ry3f.onrender.com', 'http://localhost:3000', 'https://voter-verify-face-ofgu.onrender.com'],
+  origin: ['https://voter-verify-backend-ry3f.onrender.com', 'http://localhost:3000', 'https://voter-verify-face-ofgu.onrender.com', 'https://backend-369369713332.us-central1.run.app', '*'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
@@ -32,8 +32,11 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Static files - moved before API routes
+// Static files - improved configuration for deployment
 app.use(express.static(path.join(__dirname, '../public')));
+app.use('/img', express.static(path.join(__dirname, '../public/img')));
+app.use('/css', express.static(path.join(__dirname, '../public/css')));
+app.use('/js', express.static(path.join(__dirname, '../public/js')));
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
@@ -43,6 +46,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const digitalTokenRoutes = require("./routes/digitalTokenRoutes");
 const expressRoutes = require("./routes/voterRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
+const faceVerificationRoutes = require("./routes/faceVerificationRoutes");
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -52,6 +56,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/voter', expressRoutes);
 app.use('/api/digital-token', digitalTokenRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/face-verification', faceVerificationRoutes);
 
 // Add backward compatibility routes
 app.use('/admin', adminRoutes);

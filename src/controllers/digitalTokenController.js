@@ -130,8 +130,19 @@ exports.generateDigitalToken = async (req, res) => {
         if (user.phoneNumber) {
           existingToken.phoneNumber = user.phoneNumber;
         }
-        await existingToken.save();
-        console.log("Existing token updated successfully");
+        
+        try {
+          await existingToken.save();
+          console.log("Existing token updated successfully");
+        } catch (saveError) {
+          console.error("Error saving existing token:", saveError);
+          // Return a more detailed error message
+          return res.status(500).json({ 
+            error: "Database error when saving token", 
+            details: saveError.message,
+            code: "TOKEN_SAVE_ERROR"
+          });
+        }
        
       } else {
         // Create a new token
@@ -143,12 +154,32 @@ exports.generateDigitalToken = async (req, res) => {
           token: qrData,
           phoneNumber: user.phoneNumber
         });
-        await newToken.save();
-        console.log("New token created successfully");
+        
+        try {
+          await newToken.save();
+          console.log("New token created successfully");
+        } catch (saveError) {
+          console.error("Error saving new token:", saveError, "Token data:", JSON.stringify({
+            voterId: voterId,
+            slotId: bookedSlot._id ? bookedSlot._id.toString() : null,
+            qrCodeLength: qrCodeUrl ? qrCodeUrl.length : 0,
+            tokenLength: qrData ? qrData.length : 0
+          }));
+          // Return a more detailed error message
+          return res.status(500).json({ 
+            error: "Database error when saving token", 
+            details: saveError.message,
+            code: "TOKEN_SAVE_ERROR"
+          });
+        }
       }
     } catch (saveError) {
-      console.error("Error saving token:", saveError);
-      return res.status(500).json({ error: "Database error when saving token" });
+      console.error("Error in token save process:", saveError);
+      return res.status(500).json({ 
+        error: "Database error when saving token",
+        details: saveError.message,
+        code: "TOKEN_PROCESS_ERROR"
+      });
     }
     
     console.log("Sending successful response...");

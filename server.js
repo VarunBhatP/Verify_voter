@@ -39,6 +39,9 @@ mongoose.connect(MONGODB_URI, {
       mongoose.connection.db.listCollections().toArray()
         .then(collections => {
           console.log('Collections in database:', collections.map(c => c.name).join(', '));
+          // Log static file configuration
+          console.log('Static files being served from:', require('path').join(__dirname, 'public'));
+          console.log('App environment:', process.env.NODE_ENV || 'development');
           // Start the server after confirming database connection
           startServer();
         })

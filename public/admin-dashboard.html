@@ -706,7 +706,7 @@
         async function loadTimeSlots() {
             try {
                 const token = localStorage.getItem('adminToken');
-                const response = await fetch('/api/admin/time-slots', {
+                const response = await fetch('/api/slots/available', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -1124,14 +1124,8 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                         throw new Error('No registered face found for this voter');
                     }
 
-                    // Display the registered face image
-                    const registeredFaceImage = data.user.faceImageUrl || data.user.faceEmbedding[0];
-                    if (!registeredFaceImage) {
-                        throw new Error('No valid face image found');
-                    }
-
                     // Verify face
-                    const verificationResponse = await fetch('/api/admin/verify-face', {
+                    const verificationResponse = await fetch('/api/face-verification/proxy/verify', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1139,62 +1133,16 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                         },
                         body: JSON.stringify({
                             image1: capturedImage,
-                            image2: registeredFaceImage,
+                            image2: data.user.faceImageUrl || data.user.faceEmbedding[0],
                             userId: voterId
                         })
                     });
                     
                     if (!verificationResponse.ok) {
                         console.error('Verification API error:', verificationResponse.status);
-                        // Try the face verification service directly
-                        try {
-                            const faceVerificationUrl = 'https://face-verification-369369713332.us-central1.run.app/verify';
-                            console.log('Trying direct face verification service at:', faceVerificationUrl);
-                            
-                            const directVerificationResponse = await fetch(faceVerificationUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    image1: capturedImage,
-                                    image2: registeredFaceImage,
-                                    userId: voterId
-                                })
-                            });
-                            
-                            if (directVerificationResponse.ok) {
-                                const verificationData = await directVerificationResponse.json();
-                                console.log('Direct verification response:', verificationData);
-                                
-                                // Update match percentage display
-                                const matchPercentageElement = document.getElementById('matchPercentage');
-                                const matchProgressElement = document.getElementById('matchProgress');
-                                const verificationActions = document.getElementById('verificationActions');
-                                const verificationStatus = document.getElementById('verificationStatus');
-                                
-                                if (matchPercentageElement) matchPercentageElement.textContent = verificationData.matchPercentage ? verificationData.matchPercentage.toFixed(2) : '0';
-                                if (matchProgressElement) {
-                                    const percentage = verificationData.matchPercentage || 0;
-                                    matchProgressElement.style.width = `${percentage}%`;
-                                    matchProgressElement.setAttribute('aria-valuenow', percentage);
-                                }
-                                
-                                // Show verification actions section
-                                if (verificationActions) verificationActions.style.display = 'block';
-                                
-                                handleVerificationResult(verificationData);
-                                return;
-                            } else {
-                                console.error('Direct verification failed:', await directVerificationResponse.text());
-                                throw new Error('Face verification failed with both methods');
-                            }
-                        } catch (directError) {
-                            console.error('Error with direct verification:', directError);
-                            throw new Error('Face verification failed: ' + directError.message);
-                        }
+                        throw new Error('Face verification failed');
                     }
-                    
+
                     const verificationData = await verificationResponse.json();
                     console.log('Verification response:', verificationData);
                     
@@ -1485,7 +1433,7 @@ ${voter.timeSlot ? `Time Slot: ${formatDateTime(voter.timeSlot.date, voter.timeS
                     showTimeSlotMessage('Creating time slot...', 'info');
                     
                     const token = localStorage.getItem('adminToken');
-                    const response = await fetch('/api/admin/time-slots', {
+                    const response = await fetch('/api/slots/create', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
