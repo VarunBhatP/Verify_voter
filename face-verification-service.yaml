@@ -6,7 +6,7 @@ spec:
   template:
     spec:
       containers:
-      - image: gcr.io/absolute-nexus-455918-j8/face-verification:v1
+      - image: gcr.io/absolute-nexus-455918-j8/face-verification:v2
         ports:
         - containerPort: 5001
         resources:
@@ -28,4 +28,4 @@ spec:
           periodSeconds: 30
           timeoutSeconds: 10
           successThreshold: 1
-          failureThreshold: 3 
+          failureThreshold: 3
