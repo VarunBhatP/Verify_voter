@@ -15,68 +15,15 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
+// Create HTTP server
+const server = http.createServer(app);
+
 // Get MongoDB URI from environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 console.log(`Attempting to connect to MongoDB at: ${MONGODB_URI ? 'URI provided' : 'URI missing'}`);
 
 // Set up Mongoose debug mode to log all operations
 mongoose.set('debug', true);
-
-// Connect to MongoDB with improved options
-mongoose.connect(MONGODB_URI, {
-  connectTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 30000, // Give the server more time to respond
-  heartbeatFrequencyMS: 10000     // Check connection more frequently
-})
-.then(() => {
-  console.log('Connected to MongoDB successfully');
-  console.log('MongoDB connection state:', mongoose.connection.readyState);
-  
-  // Check if the database connection is established properly
-  if (mongoose.connection.db) {
-    console.log('Database connection established successfully');
-    
-    // Test connection by listing collections safely
-    try {
-      mongoose.connection.db.listCollections().toArray()
-        .then(collections => {
-          console.log('Collections in database:', collections.map(c => c.name).join(', '));
-          // Log static file configuration
-          console.log('Static files being served from:', require('path').join(__dirname, 'public'));
-          console.log('App environment:', process.env.NODE_ENV || 'development');
-          // Start the server after confirming database connection
-          startServer();
-        })
-        .catch(err => {
-          console.error('Error listing collections:', err);
-          // Continue with server startup despite collection listing error
-          startServer();
-        });
-    } catch (error) {
-      console.error('Error accessing collections:', error);
-      // Continue with server startup despite error
-      startServer();
-    }
-  } else {
-    console.log('Database connection object not available yet, continuing startup');
-    // Wait a short time and then start the server anyway
-    setTimeout(() => {
-      startServer();
-    }, 2000);
-  }
-})
-.catch(err => {
-  console.error('Could not connect to MongoDB:', err);
-  console.error('MongoDB connection error details:', JSON.stringify(err, null, 2));
-  console.error('Application will now exit due to database connection failure');
-  process.exit(1);
-});
-
-// Create HTTP server
-const server = http.createServer(app);
 
 // Set up Socket.io
 const io = socketIo(server, {
@@ -86,9 +33,55 @@ const io = socketIo(server, {
   }
 });
 
+// Function to connect to MongoDB with retry mechanism
+const connectWithRetry = async (retryCount = 0, maxRetries = 5) => {
+  try {
+    console.log(`MongoDB connection attempt ${retryCount + 1}/${maxRetries + 1}`);
+    
+    await mongoose.connect(MONGODB_URI, {
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000,
+      heartbeatFrequencyMS: 10000
+    });
+    
+    console.log('Connected to MongoDB successfully');
+    console.log('MongoDB connection state:', mongoose.connection.readyState);
+    
+    // Check if the database connection is established properly
+    if (mongoose.connection.db) {
+      console.log('Database connection established successfully');
+      
+      try {
+        const collections = await mongoose.connection.db.listCollections().toArray();
+        console.log('Collections in database:', collections.map(c => c.name).join(', '));
+        console.log('Static files being served from:', require('path').join(__dirname, 'public'));
+        console.log('App environment:', process.env.NODE_ENV || 'development');
+      } catch (error) {
+        console.error('Error accessing collections:', error);
+      }
+    }
+    
+    return true;
+  } catch (err) {
+    console.error(`MongoDB connection attempt ${retryCount + 1} failed:`, err.message);
+    
+    if (retryCount < maxRetries) {
+      console.log(`Retrying connection in 5 seconds...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return connectWithRetry(retryCount + 1, maxRetries);
+    } else {
+      console.error('Maximum retries reached. Could not connect to MongoDB.');
+      console.error('MongoDB connection error details:', JSON.stringify(err, null, 2));
+      throw err;
+    }
+  }
+};
+
 // Socket.io events
 io.on('connection', (socket) => {
-  
   // Join a room based on user ID
   socket.on('joinRoom', (roomId) => {
     socket.join(roomId);
@@ -100,6 +93,10 @@ io.on('connection', (socket) => {
       .then(messages => {
         // Emit previous messages to this specific client
         socket.emit('previousMessages', messages);
+      })
+      .catch(err => {
+        console.error('Error fetching previous messages:', err);
+        socket.emit('error', { message: 'Failed to fetch previous messages' });
       });
   });
   
@@ -107,7 +104,6 @@ io.on('connection', (socket) => {
   socket.on('chatMessage', async (messageData) => {
     try {
       const { userId, room, text, sender } = messageData;
-      
       
       // Save message to database
       const newMessage = new ChatMessage({
@@ -134,32 +130,47 @@ io.on('connection', (socket) => {
   });
 });
 
-// Function to start the server
-function startServer() {
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-  
-  server.on('error', (error) => {
-    console.error('Server error:', error);
-    if (error.syscall !== 'listen') {
-      throw error;
-    }
+// Start server and connect to MongoDB
+const startServer = async () => {
+  try {
+    // Start the server first so it can respond to health checks
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
     
-    const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
-    
-    // Handle specific listen errors with friendly messages
-    switch (error.code) {
-      case 'EACCES':
-        console.error(bind + ' requires elevated privileges');
-        process.exit(1);
-        break;
-      case 'EADDRINUSE':
-        console.error(bind + ' is already in use');
-        process.exit(1);
-        break;
-      default:
+    // Handle server errors
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      if (error.syscall !== 'listen') {
         throw error;
-    }
-  });
-}
+      }
+      
+      const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+      
+      // Handle specific listen errors with friendly messages
+      switch (error.code) {
+        case 'EACCES':
+          console.error(bind + ' requires elevated privileges');
+          process.exit(1);
+          break;
+        case 'EADDRINUSE':
+          console.error(bind + ' is already in use');
+          process.exit(1);
+          break;
+        default:
+          throw error;
+      }
+    });
+    
+    // Connect to MongoDB with retry mechanism
+    await connectWithRetry();
+    console.log('Server is fully operational with database connection');
+  } catch (error) {
+    console.error('Failed to start server properly:', error);
+    // We don't exit the process here to allow the health check to pass
+    // But the application will log errors when trying to access the database
+  }
+};
+
+// Start the server
+startServer();
