@@ -12,7 +12,10 @@ app.set('port', PORT);
 
 // Get MongoDB URI from environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
-console.log(`Connecting to MongoDB at: ${MONGODB_URI}`);
+console.log(`Attempting to connect to MongoDB at: ${MONGODB_URI ? 'URI provided' : 'URI missing'}`);
+
+// Set up Mongoose debug mode to log all operations
+mongoose.set('debug', true);
 
 // Connect to MongoDB with improved options
 mongoose.connect(MONGODB_URI, {
@@ -21,10 +24,23 @@ mongoose.connect(MONGODB_URI, {
 })
 .then(() => {
   console.log('Connected to MongoDB successfully');
+  console.log('MongoDB connection state:', mongoose.connection.readyState);
+  console.log('Available collections:', mongoose.connection.db ? 'DB accessible' : 'DB not accessible');
+  
+  // Test connection by listing collections
+  mongoose.connection.db.listCollections().toArray()
+    .then(collections => {
+      console.log('Collections in database:', collections.map(c => c.name).join(', '));
+    })
+    .catch(err => {
+      console.error('Error listing collections:', err);
+    });
+    
   startServer();
 })
 .catch(err => {
   console.error('Could not connect to MongoDB:', err);
+  console.error('MongoDB connection error details:', JSON.stringify(err, null, 2));
   console.error('Application will now exit due to database connection failure');
   process.exit(1);
 });

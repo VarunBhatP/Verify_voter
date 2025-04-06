@@ -11,32 +11,82 @@ const User = require("../models/userModel");
 // Endpoint to generate digital token and return the QR code URL (and store/update in DB)
 exports.generateDigitalToken = async (req, res) => {
   try {
+    console.log("Starting digital token generation...");
     const voterId = req.user._id.toString();
+    console.log("User ID from auth:", voterId);
+    
+    // Check MongoDB connection
+    console.log("MongoDB connection state:", mongoose.connection.readyState);
     
     // Find the user's booked slot
-    const user = await User.findById(voterId).populate('timeSlot');
+    console.log("Finding user with ID:", voterId);
+    let user;
+    try {
+      user = await User.findById(voterId);
+      console.log("User found:", user ? "Yes" : "No");
+      if (user) {
+        console.log("User data:", JSON.stringify({
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          timeSlot: user.timeSlot
+        }));
+      }
+    } catch (userError) {
+      console.error("Error finding user:", userError);
+      return res.status(500).json({ error: "Database error when finding user" });
+    }
+    
     if (!user) {
+      console.log("User not found error");
       return res.status(404).json({ error: "User not found." });
     }
-
-    if (!user.timeSlot) {
+    
+    // Try to populate the time slot manually
+    let timeSlot = null;
+    if (user.timeSlot) {
+      try {
+        console.log("Finding time slot with ID:", user.timeSlot);
+        timeSlot = await TimeSlot.findById(user.timeSlot);
+        console.log("Time slot found:", timeSlot ? "Yes" : "No");
+        if (timeSlot) {
+          console.log("Time slot data:", JSON.stringify({
+            _id: timeSlot._id,
+            date: timeSlot.date,
+            startTime: timeSlot.startTime,
+            endTime: timeSlot.endTime
+          }));
+        }
+      } catch (slotError) {
+        console.error("Error finding time slot:", slotError);
+        return res.status(500).json({ error: "Database error when finding time slot" });
+      }
+    } else {
+      console.log("User has no time slot ID in their profile");
+    }
+    
+    if (!timeSlot) {
+      console.log("No time slot booked error");
       return res.status(400).json({ 
         error: "You need to book a time slot first before generating a digital token.",
         redirect: "/time-slot.html"
       });
     }
 
-    const bookedSlot = user.timeSlot;
+    const bookedSlot = timeSlot;
+    console.log("Booked slot ID:", bookedSlot._id);
 
     // Prepare data for the QR code - use a consistent format with just essential data
     const qrData = JSON.stringify({
       voterId: voterId,
       slotId: bookedSlot._id.toString()
     });
+    console.log("QR data prepared:", qrData);
 
     // Generate QR code URL with better options for clearer QR code
     let qrCodeUrl;
     try {
+      console.log("Generating QR code...");
       qrCodeUrl = await QRCode.toDataURL(qrData, {
         errorCorrectionLevel: 'H', // High error correction for better scanning
         margin: 2,
@@ -46,37 +96,56 @@ exports.generateDigitalToken = async (req, res) => {
           light: '#ffffff' // White background
         }
       });
+      console.log("QR code generated successfully");
       
-    } catch (error) {
-      console.error("Error generating QR code:", error);
+    } catch (qrError) {
+      console.error("Error generating QR code:", qrError);
       return res.status(500).json({ error: "Failed to generate QR code" });
     }
 
     // First check if a token already exists for this voter
-    let existingToken = await DigitalToken.findOne({ voterId: voterId });
-    
-    if (existingToken) {
-      // Update the existing token
-      existingToken.slotId = bookedSlot._id;
-      existingToken.qrCode = qrCodeUrl;
-      existingToken.token = qrData;
-      if (user.phoneNumber) {
-        existingToken.phoneNumber = user.phoneNumber;
-      }
-      await existingToken.save();
-     
-    } else {
-      // Create a new token
-      const newToken = new DigitalToken({
-        voterId: voterId,
-        slotId: bookedSlot._id,
-        qrCode: qrCodeUrl,
-        token: qrData,
-        phoneNumber: user.phoneNumber
-      });
-      await newToken.save();
+    console.log("Checking for existing token for voter ID:", voterId);
+    let existingToken;
+    try {
+      existingToken = await DigitalToken.findOne({ voterId: voterId });
+      console.log("Existing token found:", existingToken ? "Yes" : "No");
+    } catch (tokenError) {
+      console.error("Error finding existing token:", tokenError);
+      return res.status(500).json({ error: "Database error when finding existing token" });
     }
     
+    try {
+      if (existingToken) {
+        // Update the existing token
+        console.log("Updating existing token...");
+        existingToken.slotId = bookedSlot._id;
+        existingToken.qrCode = qrCodeUrl;
+        existingToken.token = qrData;
+        if (user.phoneNumber) {
+          existingToken.phoneNumber = user.phoneNumber;
+        }
+        await existingToken.save();
+        console.log("Existing token updated successfully");
+       
+      } else {
+        // Create a new token
+        console.log("Creating new token...");
+        const newToken = new DigitalToken({
+          voterId: voterId,
+          slotId: bookedSlot._id,
+          qrCode: qrCodeUrl,
+          token: qrData,
+          phoneNumber: user.phoneNumber
+        });
+        await newToken.save();
+        console.log("New token created successfully");
+      }
+    } catch (saveError) {
+      console.error("Error saving token:", saveError);
+      return res.status(500).json({ error: "Database error when saving token" });
+    }
+    
+    console.log("Sending successful response...");
     res.status(200).json({
       message: "Digital token generated successfully",
       qrCodeUrl: qrCodeUrl
@@ -93,13 +162,30 @@ exports.downloadDigitalTokenPDF = async (req, res) => {
     const voterId = req.user._id.toString();
     
     // Get the user and their time slot
-    const user = await User.findById(voterId).populate('timeSlot');
+    const user = await User.findById(voterId);
     
-    if (!user || !user.timeSlot) {
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    console.log("User data:", JSON.stringify(user));
+    
+    // Try to populate the time slot manually
+    let timeSlot = null;
+    if (user.timeSlot) {
+      try {
+        timeSlot = await TimeSlot.findById(user.timeSlot);
+        console.log("Time slot found:", timeSlot ? "Yes" : "No");
+      } catch (error) {
+        console.error("Error finding time slot:", error);
+      }
+    }
+    
+    if (!timeSlot) {
       return res.status(404).json({ error: "No booked slot found for this voter." });
     }
 
-    const bookedSlot = user.timeSlot;
+    const bookedSlot = timeSlot;
     
     // Get the digital token
     const digitalToken = await DigitalToken.findOne({ voterId: voterId });
@@ -212,7 +298,7 @@ exports.downloadDigitalTokenPDF = async (req, res) => {
     doc.font('Helvetica')
        .fontSize(8)
        .text('Generated on: ' + new Date().toLocaleString(), { align: 'center' })
-       .text('© Election Commission of India', { align: 'center' });
+       .text('Election Commission of India', { align: 'center' });
     
     // Finalize PDF
     doc.end();
@@ -286,7 +372,7 @@ exports.verifyDigitalToken = async (req, res) => {
       }
       
       // Find the associated user
-      const user = await User.findById(token.voterId).select('-password').populate('timeSlot');
+      const user = await User.findById(token.voterId).select('-password');
       
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -309,7 +395,7 @@ exports.verifyDigitalToken = async (req, res) => {
       }
       
       // Find the associated user
-      const user = await User.findById(token.voterId).select('-password').populate('timeSlot');
+      const user = await User.findById(token.voterId).select('-password');
       
       if (!user) {
         return res.status(404).json({ error: "User not found" });

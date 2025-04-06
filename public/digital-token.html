@@ -153,25 +153,35 @@
       document.getElementById("voter-details").classList.remove("hidden");
       document.getElementById("download-btn").classList.remove("hidden");
       
-      // Generate QR code from token data
-      const qrData = {
-        token: tokenData.token,
-        userId: userData._id,
-        voterId: userData.voterId,
-        name: userData.name,
-        timestamp: new Date().toISOString()
-      };
+      console.log('Token data received:', tokenData);
       
-      // Convert data to string and encode it
-      const qrString = JSON.stringify(qrData);
-      const encodedData = encodeURIComponent(qrString);
-      
-      // Create QR code URL using a QR code generator service
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedData}`;
-      
-      // Set QR code image
+      // Set QR code image using the URL directly from the backend
       const qrImg = document.getElementById("qr-code");
-      qrImg.src = qrCodeUrl;
+      
+      // Check if we have a QR code URL from the backend
+      if (tokenData && tokenData.qrCodeUrl) {
+        console.log('Using QR code URL from backend:', tokenData.qrCodeUrl);
+        qrImg.src = tokenData.qrCodeUrl;
+      } else {
+        console.log('No QR code URL in response, generating one locally');
+        // Fallback to generating QR code locally
+        const qrData = {
+          token: tokenData.token,
+          userId: userData._id,
+          voterId: userData.voterId,
+          name: userData.name,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Convert data to string and encode it
+        const qrString = JSON.stringify(qrData);
+        const encodedData = encodeURIComponent(qrString);
+        
+        // Create QR code URL using a QR code generator service
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedData}`;
+        qrImg.src = qrCodeUrl;
+      }
+      
       qrImg.alt = "Digital Token for " + (userData?.name || "Voter");
       
       // Add event listener for QR code image loading
@@ -232,14 +242,17 @@
 
     async function generateToken() {
       try {
+        console.log('Starting digital token generation process...');
         const token = localStorage.getItem('token');
         if (!token) {
+          console.error('No authentication token found in localStorage');
           showError('Please log in to generate a token');
           setTimeout(() => {
             window.location.href = 'login.html';
           }, 2000);
           return;
         }
+        console.log('Authentication token found');
 
         // Show loading state
         document.getElementById('loading-container').classList.remove('hidden');
@@ -249,6 +262,7 @@
         document.getElementById('download-btn').classList.add('hidden');
 
         // Fetch user profile
+        console.log('Fetching user profile...');
         const response = await fetch('/api/user/profile', {
           headers: {
             'Authorization': 'Bearer ' + token,
@@ -258,8 +272,10 @@
         });
 
         console.log('Profile response status:', response.status);
+        console.log('Profile response headers:', Object.fromEntries([...response.headers]));
 
         if (response.status === 401) {
+          console.error('Authentication failed (401) when fetching profile');
           localStorage.removeItem('token');
           showError('Session expired. Please log in again.');
           setTimeout(() => {
@@ -269,14 +285,22 @@
         }
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch user profile');
+          const errorText = await response.text();
+          console.error('Error fetching profile. Status:', response.status, 'Response:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.message || errorData.error || 'Failed to fetch user profile');
+          } catch (e) {
+            throw new Error('Failed to fetch user profile: ' + response.status);
+          }
         }
 
         const userData = await response.json();
-        console.log('User profile data:', userData);
+        console.log('User profile data received:', userData);
+        console.log('User has time slot:', userData.timeSlot ? 'Yes' : 'No');
 
         // Generate digital token
+        console.log('Requesting digital token generation...');
         const tokenResponse = await fetch('/api/digital-token/generate', {
           method: 'POST',
           headers: {
@@ -287,8 +311,10 @@
         });
 
         console.log('Token generation response status:', tokenResponse.status);
+        console.log('Token generation response headers:', Object.fromEntries([...tokenResponse.headers]));
 
         if (tokenResponse.status === 401) {
+          console.error('Authentication failed (401) when generating token');
           localStorage.removeItem('token');
           showError('Session expired. Please log in again.');
           setTimeout(() => {
@@ -298,12 +324,27 @@
         }
 
         if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.json();
-          throw new Error(errorData.message || 'Failed to generate token');
+          const errorText = await tokenResponse.text();
+          console.error('Error generating token. Status:', tokenResponse.status, 'Response:', errorText);
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.redirect) {
+              console.log('Redirect instruction received:', errorData.redirect);
+              showError(errorData.error || 'You need to book a time slot first');
+              setTimeout(() => {
+                window.location.href = errorData.redirect;
+              }, 2000);
+              return;
+            }
+            throw new Error(errorData.message || errorData.error || 'Failed to generate token');
+          } catch (e) {
+            throw new Error('Failed to generate token: ' + tokenResponse.status);
+          }
         }
 
         const tokenData = await tokenResponse.json();
         console.log('Generated token data:', tokenData);
+        console.log('QR code URL received:', tokenData.qrCodeUrl ? 'Yes' : 'No');
 
         // Display QR code and user info
         showQRCode(tokenData, userData);
