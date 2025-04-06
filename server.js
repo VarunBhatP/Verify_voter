@@ -10,6 +10,11 @@ dotenv.config();
 const PORT = process.env.PORT || 8080;
 app.set('port', PORT);
 
+// Add health check endpoint for Cloud Run
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Get MongoDB URI from environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
 console.log(`Attempting to connect to MongoDB at: ${MONGODB_URI ? 'URI provided' : 'URI missing'}`);
