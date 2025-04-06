@@ -47,6 +47,7 @@ const digitalTokenRoutes = require("./routes/digitalTokenRoutes");
 const expressRoutes = require("./routes/voterRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
 const faceVerificationRoutes = require("./routes/faceVerificationRoutes");
+const visionRoutes = require("./routes/visionRoutes");
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -57,6 +58,7 @@ app.use('/voter', expressRoutes);
 app.use('/api/digital-token', digitalTokenRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/face-verification', faceVerificationRoutes);
+app.use('/api/vision', visionRoutes);
 
 // Add backward compatibility routes
 app.use('/admin', adminRoutes);
@@ -75,32 +77,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/evoting',
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  try {
-    // Check MongoDB connection
-    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    
-    // Get memory usage
-    const memoryUsage = process.memoryUsage();
-    const memoryStatus = {
-      rss: Math.round(memoryUsage.rss / 1024 / 1024) + 'MB',
-      heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024) + 'MB',
-      heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024) + 'MB',
-      external: Math.round(memoryUsage.external / 1024 / 1024) + 'MB'
-    };
-    
-    res.status(200).json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      database: dbStatus,
-      memory: memoryStatus
-    });
-  } catch (error) {
-    console.error('Health check failed:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message
-    });
-  }
+  // Simple health check that responds immediately
+  // This is critical for Cloud Run deployment
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Default route
@@ -110,10 +92,10 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ 
+  console.error('Global error handler:', err);
+  res.status(500).json({
     error: 'Internal Server Error',
-    message: err.message 
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message
   });
 });
 

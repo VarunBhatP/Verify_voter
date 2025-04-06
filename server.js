@@ -10,11 +10,6 @@ dotenv.config();
 const PORT = process.env.PORT || 8080;
 app.set('port', PORT);
 
-// Add health check endpoint for Cloud Run
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
 // Create HTTP server
 const server = http.createServer(app);
 
@@ -134,6 +129,7 @@ io.on('connection', (socket) => {
 const startServer = async () => {
   try {
     // Start the server first so it can respond to health checks
+    // This is critical for Cloud Run deployment
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
@@ -163,12 +159,17 @@ const startServer = async () => {
     });
     
     // Connect to MongoDB with retry mechanism
-    await connectWithRetry();
-    console.log('Server is fully operational with database connection');
+    // But don't block server startup on MongoDB connection
+    connectWithRetry().then(() => {
+      console.log('Server is fully operational with database connection');
+    }).catch(err => {
+      console.error('Failed to connect to MongoDB after multiple retries:', err.message);
+      console.log('Server will continue running without MongoDB connection');
+      // We don't exit the process here to allow the health check to pass
+    });
   } catch (error) {
     console.error('Failed to start server properly:', error);
-    // We don't exit the process here to allow the health check to pass
-    // But the application will log errors when trying to access the database
+    // Log the error but don't exit to allow health check to pass
   }
 };
 
